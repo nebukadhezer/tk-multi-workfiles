@@ -52,46 +52,52 @@ class SaveAs(object):
         
         # determine if this is a publish path or not:
         is_publish = self._publish_template.validate(current_path)
-        fields = {}
+        
+        # see if name is used in the work template:
+        name_is_used = "name" in self._work_template.keys
+        
+        # update some initial info:        
         title = "Tank Save As"
         name = ""
-
         if is_publish:
-            fields = self._publish_template.get_fields(current_path)
             title = "Copy to Work Area"
-            name = fields.get("name")
+            if name_is_used:
+                fields = self._publish_template.get_fields(current_path)
+                name = fields.get("name")
         else:
-            default_name = "scene"
-            fields = {}
-            if self._work_template.validate(current_path):
-                fields = self._work_template.get_fields(current_path)
-                title = "Tank Save As"
-                name = fields.get("name") or default_name
-            else:
-                name = default_name
-                fields = self._app.context.as_template_fields(self._work_template)
-            
-            try:
-                # make sure the work file name doesn't already exist:
-                # note, this could potentially be slow so for now lets
-                # limit it:
-                counter_limit = 10
-                for counter in range(0, counter_limit):
-                    test_name = name
-                    if counter > 0:
-                        test_name = "%s%d" % (name, counter)
-                    
-                    test_fields = fields.copy()
-                    test_fields["name"] = test_name
+            if name_is_used:
+                # (AD) - TODO - get the default name from the settings:
+                default_name = "scene"
                 
-                    existing_files = self._app.tank.paths_from_template(self._work_template, test_fields, ["version"])
-                    if not existing_files:
-                        name = test_name
-                        break
+                name = default_name
+                fields = {}
+                if self._work_template.validate(current_path):
+                    fields = self._work_template.get_fields(current_path)
+                    name = fields.get("name") or default_name
+                else:
+                    fields = self._app.context.as_template_fields(self._work_template)
+                
+                try:
+                    # make sure the work file name doesn't already exist:
+                    # note, this could potentially be slow so for now lets
+                    # limit it:
+                    counter_limit = 10
+                    for counter in range(0, counter_limit):
+                        test_name = name
+                        if counter > 0:
+                            test_name = "%s%d" % (name, counter)
+                        
+                        test_fields = fields.copy()
+                        test_fields["name"] = test_name
                     
-            except TankError, e:
-                # this shouldn't be fatal so just log a debug message:
-                self._app.log_debug("Warning - failed to find a default name for Tank Save-As: %s" % e)
+                        existing_files = self._app.tank.paths_from_template(self._work_template, test_fields, ["version"])
+                        if not existing_files:
+                            name = test_name
+                            break
+                        
+                except TankError, e:
+                    # this shouldn't be fatal so just log a debug message:
+                    self._app.log_debug("Warning - failed to find a default name for Tank Save-As: %s" % e)
                 
         
         worker_cb = lambda details, wp=current_path, ip=is_publish: self.generate_new_work_file_path(wp, ip, details.get("name"), details.get("reset_version"))
@@ -99,7 +105,7 @@ class SaveAs(object):
             while True:
                 # show modal dialog:
                 from .save_as_form import SaveAsForm
-                (res, form) = self._app.engine.show_modal(title, self._app, SaveAsForm, preview_updater, is_publish, name)
+                (res, form) = self._app.engine.show_modal(title, self._app, SaveAsForm, preview_updater, is_publish, name_is_used, name)
                 
                 if res == QtGui.QDialog.Accepted:
                     # get details from UI:
@@ -165,13 +171,14 @@ class SaveAs(object):
         can_reset_version = False
 
         # validate name:
-        if not new_name:
-            msg = "You must enter a name!"
-            return {"message":msg}
-        
-        if not self._work_template.keys["name"].validate(new_name):
-            msg = "Your filename contains illegal characters!"
-            return {"message":msg}
+        if "name" in self._work_template.keys:
+            if not self._work_template.is_optional("name") and not new_name:
+                msg = "You must enter a name!"
+                return {"message":msg}
+
+            if new_name and not self._work_template.keys["name"].validate(new_name):
+                msg = "Your filename contains illegal characters!"
+                return {"message":msg}
 
         # get fields from current path:
         fields = {}
@@ -188,8 +195,13 @@ class SaveAs(object):
         fields = dict(chain(self._app.context.as_template_fields(self._work_template).iteritems(), fields.iteritems()))
 
         # update name field:
-        fields["name"] = new_name
-
+        if new_name:
+            fields["name"] = new_name
+        else:
+            # clear the current name:
+            if "name" in fields:
+                del fields["name"]
+                
         # find the current max work file and publish versions:
         from .versioning import Versioning
         versioning = Versioning(self._app)

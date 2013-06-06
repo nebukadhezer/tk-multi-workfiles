@@ -16,7 +16,7 @@ class SaveAsForm(QtGui.QWidget):
     def exit_code(self):
         return self._exit_code
     
-    def __init__(self, preview_updater, is_publish, name, parent = None):
+    def __init__(self, preview_updater, is_publish, name_is_used, name, parent = None):
         """
         Construction
         """
@@ -41,7 +41,8 @@ class SaveAsForm(QtGui.QWidget):
         self._ui.reset_version_cb.stateChanged.connect(self._on_reset_version_changed)
 
         self._ui.name_edit.setText(name)
-        if not self._launched_from_publish:
+        #self._ui.name_edit.setEnabled(name_is_used)
+        if name_is_used and not self._launched_from_publish:
             # make sure text in name edit is selected ready to edit:
             self._ui.name_edit.setFocus()
             self._ui.name_edit.selectAll()
