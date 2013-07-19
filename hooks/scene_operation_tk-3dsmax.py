@@ -9,33 +9,35 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 import os
-from Py3dsMax import mxs
+
+import MaxPlus
 
 import tank
 from tank import Hook
 from tank import TankError
 
+
 class SceneOperation(Hook):
     """
-    Hook called to perform an operation with the 
+    Hook called to perform an operation with the
     current scene
     """
-    
+
     def execute(self, operation, file_path, context, parent_action, **kwargs):
         """
         Main hook entry point
-        
-        :operation:     String
-                        Scene operation to perform
-        
-        :file_path:     String
-                        File path to use if the operation
-                        requires it (e.g. open)
-                    
-        :context:       Context
-                        The context the file operation is being
-                        performed in.
-                    
+
+        :operation: String
+                    Scene operation to perform
+
+        :file_path: String
+                    File path to use if the operation
+                    requires it (e.g. open)
+
+        :context:   Context
+                    The context the file operation is being
+                    performed in.
+
         :parent_action: This is the action that this scene operation is
                         being executed for.  This can be one of: 
                         - open_file
@@ -43,41 +45,32 @@ class SceneOperation(Hook):
                         - save_file_as 
                         - version_up
                             
-        :returns:       Depends on operation:
-                        'current_path' - Return the current scene
-                                         file path as a String
-                        'reset'        - True if scene was reset to an empty 
-                                         state, otherwise False
-                        all others     - None
+        :returns:   Depends on operation:
+                    'current_path' - Return the current scene
+                                     file path as a String
+                    'reset'        - True if scene was reset to an empty
+                                     state, otherwise False
+                    all others     - None
         """
-        
+
         if operation == "current_path":
             # return the current scene path
-            if not mxs.maxFileName:
+            file_path = MaxPlus.FileManager.GetFileNameAndPath().data()
+            if not file_path:
                 return ""
-            return os.path.join(mxs.maxFilePath, mxs.maxFileName)
+            return file_path
         elif operation == "open":
             # open the specified scene
-            mxs.loadMaxFile(file_path)
+            MaxPlus.FileManager.Open(file_path)
         elif operation == "save":
             # save the current scene:
-            file_path = os.path.join(mxs.maxFilePath, mxs.maxFileName)
-            mxs.saveMaxFile(file_path)
+            MaxPlus.FileManager.Save()
         elif operation == "save_as":
             # save the scene as file_path:
-            mxs.saveMaxFile(file_path)
+            MaxPlus.FileManager.Save(file_path)
         elif operation == "reset":
             """
             Reset the scene to an empty state
             """
-            # use the standard Max mechanism to check
-            # for and save the file if required:
-            if not mxs.checkForSave():
-                return False
-            
-            # now reset the scene:
-            mxs.resetMAXFile(mxs.pyhelper.namify("noPrompt"))
-            
+            MaxPlus.FileManager.Reset(True)
             return True
-
-
